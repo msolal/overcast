@@ -7,6 +7,7 @@ from pathlib import Path
 
 from overcast import workflows
 
+
 @click.group(chain=True)
 @click.pass_context
 def cli(context):
@@ -92,28 +93,49 @@ def tune(
     )
 
 
-@cli.command("jasmin-lr")
+@cli.command("jasmin")
 @click.pass_context
 @click.option(
     "--root", type=str, required=True, help="location of dataset",
+)
+@click.option(
+    "--resolution",
+    type=str,
+    default="low",
+    help="dataset resolution (to account for different variable names)",
 )
 @click.option(
     "--covariates",
     "-c",
     type=str,
     multiple=True,
-    default=["RH900", "RH850", "RH700", "LTS", "EIS", "w500", "whoi_sst",],
+    default=[
+        "MERRA_RH950",
+        "MERRA_RH850",
+        "MERRA_RH700",
+        "MERRA_LTS",
+        "MERRA_W500",
+        "ERA_sst",
+    ]
+    if "--resolution" == "high"
+    else ["RH900", "RH850", "RH700", "LTS", "EIS", "w500", "whoi_sst"],
     help="covariate keys",
 )
 @click.option(
-    "--treatment", "-t", type=str, default="tot_aod", help="treatment key",
+    "--treatment",
+    "-t",
+    type=str,
+    default="MERRA_aod" if "--resolution" == "high" else "tot_aod",
+    help="treatment key",
 )
 @click.option(
     "--outcomes",
     "-o",
     type=str,
     multiple=True,
-    default=["l_re", "liq_pc", "cod", "cwp"],
+    default=["Cloud_Effective_Radius", "Cloud_Optical_Thickness", "Cloud_Water_Path"]
+    if "--resolution" == "high"
+    else ["l_re", "liq_pc", "cod", "cwp"],
     help="outcome keys",
 )
 @click.option(
@@ -134,12 +156,13 @@ def tune(
 @click.option(
     "--bootstrap",
     type=bool,
-    default=True,
+    default=True if "--resolution" == "high" else False,
     help="bootstrap sample the training dataset, default=True",
 )
-def jasmin_lr(
+def jasmin(
     context,
     root,
+    resolution,
     covariates,
     treatment,
     outcomes,
@@ -148,11 +171,13 @@ def jasmin_lr(
     filter_precip,
     bootstrap,
 ):
+    print(covariate) # just to debug
     outcomes = list(outcomes)
     covariates = list(covariates)
     job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin-lr"
-    dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
+    dataset_name = "jasmin"
+    dataset_folder = dataset_name + f"_resolution-{resolution}"
+    dataset_folder += f"_treatment-{treatment}_covariates"
     for c in covariates:
         dataset_folder += f"-{c}"
     dataset_folder += "_outcomes"
@@ -167,6 +192,7 @@ def jasmin_lr(
             "ds_train": {
                 "root": root,
                 "split": "train",
+                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
@@ -178,6 +204,7 @@ def jasmin_lr(
             "ds_valid": {
                 "root": root,
                 "split": "valid",
+                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
@@ -189,6 +216,8 @@ def jasmin_lr(
             "ds_test": {
                 "root": root,
                 "split": "test",
+                "resolution": resolution,
+                "x_vars": covariates,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
@@ -201,28 +230,49 @@ def jasmin_lr(
     )
 
 
-@cli.command("jasmin-daily-lr")
+@cli.command("jasmin-daily")
 @click.pass_context
 @click.option(
     "--root", type=str, required=True, help="location of dataset",
+)
+@click.option(
+    "--resolution",
+    type=str,
+    default="low",
+    help="dataset resolution (to account for different variable names)",
 )
 @click.option(
     "--covariates",
     "-c",
     type=str,
     multiple=True,
-    default=["RH900", "RH850", "RH700", "LTS", "EIS", "w500", "whoi_sst",],
+    default=[
+        "MERRA_RH950",
+        "MERRA_RH850",
+        "MERRA_RH700",
+        "MERRA_LTS",
+        "MERRA_W500",
+        "ERA_sst",
+    ]
+    if "--resolution" == "high"
+    else ["RH900", "RH850", "RH700", "LTS", "EIS", "w500", "whoi_sst"],
     help="covariate keys",
 )
 @click.option(
-    "--treatment", "-t", type=str, default="tot_aod", help="treatment key",
+    "--treatment",
+    "-t",
+    type=str,
+    default="MERRA_aod" if "--resolution" == "high" else "tot_aod",
+    help="treatment key",
 )
 @click.option(
     "--outcomes",
     "-o",
     type=str,
     multiple=True,
-    default=["l_re", "liq_pc", "cod", "cwp"],
+    default=["Cloud_Effective_Radius", "Cloud_Optical_Thickness", "Cloud_Water_Path"]
+    if "--resolution" == "high"
+    else ["l_re", "liq_pc", "cod", "cwp"],
     help="outcome keys",
 )
 @click.option(
@@ -243,12 +293,13 @@ def jasmin_lr(
 @click.option(
     "--bootstrap",
     type=bool,
-    default=True,
+    default=True if "--resolution" == "high" else False,
     help="bootstrap sample the training dataset, default=True",
 )
-def jasmin_daily_lr(
+def jasmin_daily(
     context,
     root,
+    resolution,
     covariates,
     treatment,
     outcomes,
@@ -260,8 +311,9 @@ def jasmin_daily_lr(
     outcomes = list(outcomes)
     covariates = list(covariates)
     job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin-daily-lr"
-    dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
+    dataset_name = "jasmin-daily"
+    dataset_folder = dataset_name + f"_resolution-{resolution}"
+    dataset_folder += f"_treatment-{treatment}_covariates"
     for c in covariates:
         dataset_folder += f"-{c}"
     dataset_folder += "_outcomes"
@@ -277,6 +329,7 @@ def jasmin_daily_lr(
             "ds_train": {
                 "root": root,
                 "split": "train",
+                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
@@ -289,6 +342,7 @@ def jasmin_daily_lr(
             "ds_valid": {
                 "root": root,
                 "split": "valid",
+                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
@@ -301,6 +355,7 @@ def jasmin_daily_lr(
             "ds_test": {
                 "root": root,
                 "split": "test",
+                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
@@ -313,242 +368,7 @@ def jasmin_daily_lr(
         }
     )
 
-@cli.command("jasmin-hr")
-@click.pass_context
-@click.option(
-    "--root", type=str, required=True, help="location of dataset",
-)
-@click.option(
-    "--covariates",
-    "-c",
-    type=str,
-    multiple=True,
-    default=[
-        "MERRA_RH950",
-        "MERRA_RH850",
-        "MERRA_RH700",
-        "MERRA_LTS",
-        "MERRA_W500",
-        "ERA_sst",
-    ],
-    help="covariate keys",
-)
-@click.option(
-    "--treatment", "-t", type=str, default="MERRA_aod", help="treatment key",
-)
-@click.option(
-    "--outcomes",
-    "-o",
-    type=str,
-    multiple=True,
-    default=["Cloud_Effective_Radius", "Cloud_Optical_Thickness", "Cloud_Water_Path"],
-    help="outcome keys",
-)
-@click.option(
-    "--num-bins",
-    type=int,
-    default=1,
-    help="Number of bins to discretize treatment variable, default=1 (treatment is continuous)",
-)
-@click.option(
-    "--filter-aod",
-    type=bool,
-    default=True,
-    help="Filter out aod values less than 0.07 and greater than 1",
-)
-@click.option(
-    "--filter-precip", type=bool, default=True, help="Filter out raining clouds",
-)
-@click.option(
-    "--bootstrap",
-    type=bool,
-    default=True,
-    help="bootstrap sample the training dataset, default=True",
-)
-def jasmin_hr(
-    context,
-    root,
-    covariates,
-    treatment,
-    outcomes,
-    num_bins,
-    filter_aod,
-    filter_precip,
-    bootstrap,
-):
-    outcomes = list(outcomes)
-    covariates = list(covariates)
-    job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin-hr"
-    dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
-    for c in covariates:
-        dataset_folder += f"-{c}"
-    dataset_folder += "_outcomes"
-    for o in outcomes:
-        dataset_folder += f"-{o}"
-    dataset_folder += f"_bins-{num_bins}"
-    experiment_dir = job_dir / dataset_folder
-    context.obj.update(
-        {
-            "dataset_name": dataset_name,
-            "experiment_dir": str(experiment_dir),
-            "ds_train": {
-                "root": root,
-                "split": "train",
-                "x_vars": covariates,
-                "t_var": treatment,
-                "y_vars": outcomes,
-                "t_bins": num_bins,
-                "filter_aod": filter_aod,
-                "filter_precip": filter_precip,
-                "bootstrap": bootstrap,
-            },
-            "ds_valid": {
-                "root": root,
-                "split": "valid",
-                "x_vars": covariates,
-                "t_var": treatment,
-                "y_vars": outcomes,
-                "t_bins": num_bins,
-                "filter_aod": filter_aod,
-                "filter_precip": filter_precip,
-                "bootstrap": False,
-            },
-            "ds_test": {
-                "root": root,
-                "split": "test",
-                "x_vars": covariates,
-                "t_var": treatment,
-                "y_vars": outcomes,
-                "t_bins": num_bins,
-                "filter_aod": filter_aod,
-                "filter_precip": filter_precip,
-                "bootstrap": False,
-            },
-        }
-    )
 
-
-@cli.command("jasmin-daily-hr")
-@click.pass_context
-@click.option(
-    "--root", type=str, required=True, help="location of dataset",
-)
-@click.option(
-    "--covariates",
-    "-c",
-    type=str,
-    multiple=True,
-    default=[
-        "MERRA_RH950",
-        "MERRA_RH850",
-        "MERRA_RH700",
-        "MERRA_LTS",
-        "MERRA_W500",
-        "ERA_sst",
-    ],
-    help="covariate keys",
-)
-@click.option(
-    "--treatment", "-t", type=str, default="MERRA_aod", help="treatment key",
-)
-@click.option(
-    "--outcomes",
-    "-o",
-    type=str,
-    multiple=True,
-    default=["Cloud_Effective_Radius", "Cloud_Optical_Thickness", "Cloud_Water_Path"],
-    help="outcome keys",
-)
-@click.option(
-    "--num-bins",
-    type=int,
-    default=1,
-    help="Number of bins to discretize treatment variable, default=2",
-)
-@click.option(
-    "--filter-aod",
-    type=bool,
-    default=True,
-    help="Filter out aod values less than 0.07 and greater than 1",
-)
-@click.option(
-    "--filter-precip", type=bool, default=True, help="Filter out raining clouds",
-)
-@click.option(
-    "--bootstrap",
-    type=bool,
-    default=True,
-    help="bootstrap sample the training dataset, default=True",
-)
-def jasmin_daily_hr(
-    context,
-    root,
-    covariates,
-    treatment,
-    outcomes,
-    num_bins,
-    filter_aod,
-    filter_precip,
-    bootstrap,
-):
-    outcomes = list(outcomes)
-    covariates = list(covariates)
-    job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin-daily-hr"
-    dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
-    for c in covariates:
-        dataset_folder += f"-{c}"
-    dataset_folder += "_outcomes"
-    for o in outcomes:
-        dataset_folder += f"-{o}"
-    dataset_folder += f"_bins-{num_bins}"
-    dataset_folder += f"_bs-{bootstrap}"
-    experiment_dir = job_dir / dataset_folder
-    context.obj.update(
-        {
-            "dataset_name": dataset_name,
-            "experiment_dir": str(experiment_dir),
-            "ds_train": {
-                "root": root,
-                "split": "train",
-                "x_vars": covariates,
-                "t_var": treatment,
-                "y_vars": outcomes,
-                "t_bins": num_bins,
-                "filter_aod": filter_aod,
-                "filter_precip": filter_precip,
-                "pad": True,
-                "bootstrap": bootstrap,
-            },
-            "ds_valid": {
-                "root": root,
-                "split": "valid",
-                "x_vars": covariates,
-                "t_var": treatment,
-                "y_vars": outcomes,
-                "t_bins": num_bins,
-                "filter_aod": filter_aod,
-                "filter_precip": filter_precip,
-                "pad": True,
-                "bootstrap": False,
-            },
-            "ds_test": {
-                "root": root,
-                "split": "test",
-                "x_vars": covariates,
-                "t_var": treatment,
-                "y_vars": outcomes,
-                "t_bins": num_bins,
-                "filter_aod": filter_aod,
-                "filter_precip": filter_precip,
-                "pad": False,
-                "bootstrap": False,
-            },
-        }
-    )
-
-    
 @cli.command("dose-response")
 @click.pass_context
 @click.option(

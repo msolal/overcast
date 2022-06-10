@@ -209,7 +209,8 @@ class PyTorchModel(BaseModel):
             )
             return
         self.logger.info("Loading saved checkpoint {}".format(p))
-        checkpoint = torch.load(p)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        checkpoint = torch.load(p, map_location=device)
         self.network.load_state_dict(checkpoint["network"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
         self.trainer.state = checkpoint["engine"]
@@ -274,7 +275,8 @@ class AuxiliaryTaskPyTorchModel(PyTorchModel):
             )
             return
         self.logger.info("Loading saved checkpoint {}".format(p))
-        checkpoint = torch.load(p)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        checkpoint = torch.load(p, map_location=device)
         self.network_aux.load_state_dict(checkpoint["network_aux"])
         self.optimizer_aux.load_state_dict(checkpoint["optimizer_aux"])
 

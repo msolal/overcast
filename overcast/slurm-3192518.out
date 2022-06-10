@@ -1,0 +1,29 @@
+Running overcast
+('RH900', 'RH850', 'RH700', 'LTS', 'EIS', 'w500', 'whoi_sst')
+Traceback (most recent call last):
+  File "/home/users/msolal/miniconda3/envs/overcast/bin/overcast", line 33, in <module>
+    sys.exit(load_entry_point('overcast', 'console_scripts', 'overcast')())
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/click/core.py", line 1128, in __call__
+    return self.main(*args, **kwargs)
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/click/core.py", line 1053, in main
+    rv = self.invoke(ctx)
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/click/core.py", line 1690, in invoke
+    rv.append(sub_ctx.command.invoke(sub_ctx))
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/click/core.py", line 1395, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/click/core.py", line 754, in invoke
+    return __callback(*args, **kwargs)
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/click/decorators.py", line 26, in new_func
+    return f(get_current_context(), *args, **kwargs)
+  File "/home/users/msolal/msc-project/overcast/overcast/main.py", line 812, in appended_treatment_an
+    ray.get(results)
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/ray/_private/client_mode_hook.py", line 89, in wrapper
+    return func(*args, **kwargs)
+  File "/home/users/msolal/miniconda3/envs/overcast/lib/python3.9/site-packages/ray/worker.py", line 1621, in get
+    raise value.as_instanceof_cause()
+ray.exceptions.RayTaskError(TypeError): [36mray::trainer()[39m (pid=69859, ip=172.17.2.91)
+  File "/home/users/msolal/msc-project/overcast/overcast/main.py", line 800, in trainer
+    func = workflows.transformer.appended_treatment.train(**kwargs)
+  File "/home/users/msolal/msc-project/overcast/overcast/workflows/transformer/appended_treatment.py", line 16, in train
+    train_dataset = datasets.DATASETS.get(dataset_name)(**config.get("ds_train"))
+TypeError: __init__() got an unexpected keyword argument 'resolution'

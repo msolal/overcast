@@ -132,3 +132,7 @@ dmypy.json
 data/
 output/
 *.npy
+
+# Slurm scripts & outputs
+*.sh
+*.out

@@ -422,7 +422,7 @@ class JASMINDailyHighResolution(data.Dataset):
             # df = df[df[t_var].between(0.07, 1.0)]
             df.loc[~df[t_var].between(0.07, 1.0), y_vars] = np.nan
         if "imerg_precip" in df.columns and filter_precip:
-            df.loc[df["imerg_precip"] >= 0.5, y_vars] = np.
+            df.loc[df["imerg_precip"] >= 0.5, y_vars] = np.nan
         if "imerg_precip_T30" in df.columns and filter_precip:
             df.loc[df["imerg_precip_T30"] >= 0.5, y_vars] = np.nan
         if "imerg_precip_T60" in df.columns and filter_precip:

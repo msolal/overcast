@@ -134,8 +134,8 @@ def tune(
 @click.option(
     "--bootstrap",
     type=bool,
-    default=True,
-    help="bootstrap sample the training dataset, default=True",
+    default=False,
+    help="bootstrap sample the training dataset, default=False",
 )
 def jasmin_lr(
     context,
@@ -243,8 +243,8 @@ def jasmin_lr(
 @click.option(
     "--bootstrap",
     type=bool,
-    default=True,
-    help="bootstrap sample the training dataset, default=True",
+    default=False,
+    help="bootstrap sample the training dataset, default=False",
 )
 def jasmin_daily_lr(
     context,
@@ -362,8 +362,8 @@ def jasmin_daily_lr(
 @click.option(
     "--bootstrap",
     type=bool,
-    default=True,
-    help="bootstrap sample the training dataset, default=True",
+    default=False,
+    help="bootstrap sample the training dataset, default=False",
 )
 def jasmin_hr(
     context,
@@ -478,8 +478,8 @@ def jasmin_hr(
 @click.option(
     "--bootstrap",
     type=bool,
-    default=True,
-    help="bootstrap sample the training dataset, default=True",
+    default=False,
+    help="bootstrap sample the training dataset, default=False",
 )
 def jasmin_daily_hr(
     context,
@@ -563,8 +563,8 @@ def jasmin_daily_hr(
 @click.option(
     "--bootstrap",
     type=bool,
-    default=True,
-    help="bootstrap sample the training dataset, default=True",
+    default=False,
+    help="bootstrap sample the training dataset, default=False",
 )
 @click.option(
     "--seed", type=int, default=0, help="default=0",
@@ -662,7 +662,7 @@ def dose_response(
     help="number of examples to read during each training step, default=4096",
 )
 @click.option(
-    "--epochs", type=int, default=10, help="number of training epochs, default=10"
+    "--epochs", type=int, default=400, help="number of training epochs, default=400"
 )
 @click.option(
     "--ensemble-size",
@@ -786,7 +786,7 @@ def discrete_treatment_nn(
     help="number of examples to read during each training step, default=2048",
 )
 @click.option(
-    "--epochs", type=int, default=10, help="number of training epochs, default=10"
+    "--epochs", type=int, default=300, help="number of training epochs, default=300"
 )
 @click.option(
     "--ensemble-size",
@@ -915,7 +915,7 @@ def appended_treatment_nn(
     help="number of examples to read during each training step, default=2048",
 )
 @click.option(
-    "--epochs", type=int, default=10, help="number of training epochs, default=10"
+    "--epochs", type=int, default=500, help="number of training epochs, default=500"
 )
 @click.option(
     "--ensemble-size",

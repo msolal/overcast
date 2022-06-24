@@ -17,6 +17,8 @@ class JASMINLowResolution(data.Dataset):
         t_bins: int = 2,
         filter_aod: bool = True,
         filter_precip: bool = True,
+        filter_lwp: bool = True,
+        filter_re: bool = True,
         bootstrap=False,
     ) -> None:
         super(JASMINLowResolution, self).__init__()
@@ -40,6 +42,12 @@ class JASMINLowResolution(data.Dataset):
             df = df[df[t_var].between(0.07, 1.0)]
         if "precip" in df.columns and filter_precip:
             df = df[df["precip"] < 0.5]
+        # Filter lwp values
+        if filter_lwp: 
+            df = df[df["cwp"] < 250]
+        # Filter re values
+        if filter_re: 
+            df = df[df["l_re"] < 30]
         # Make train test valid split
         days = df["timestamp"].unique()
         days_valid = set(days[5::7])
@@ -279,6 +287,8 @@ class JASMINHighResolution(data.Dataset):
         t_bins: int = 2,
         filter_aod: bool = True,
         filter_precip: bool = True,
+        filter_lwp: bool = True,
+        filter_re: bool = True,
         bootstrap=False,
     ) -> None:
         super(JASMINHighResolution, self).__init__()
@@ -297,6 +307,7 @@ class JASMINHighResolution(data.Dataset):
                 "Cloud_Effective_Radius",
                 "Cloud_Optical_Thickness",
                 "Cloud_Water_Path",
+                "Nd",
             ]
         # Read csv
         df = pd.read_csv(root, index_col=0)
@@ -309,6 +320,12 @@ class JASMINHighResolution(data.Dataset):
             df = df[df["imerg_precip_T30"] < 0.5]
         if "imerg_precip_T60" in df.columns and filter_precip:
             df = df[df["imerg_precip_T60"] < 0.5]
+        # Filter lwp values
+        if filter_lwp: 
+            df = df[df["Cloud_Water_Path"].between(20, 80)]
+        # Filter re values
+        if filter_re: 
+            df = df[df["Cloud_Effective_Radius"] < 30]
         # Make train test valid split
         days = df["dates"].unique()
         days_valid = set(days[5::7])
@@ -414,6 +431,7 @@ class JASMINDailyHighResolution(data.Dataset):
                 "Cloud_Effective_Radius",
                 "Cloud_Optical_Depth",
                 "Cloud_Water_Path",
+                "Nd",
             ]
         # Read csv
         df = pd.read_csv(root, index_col=0)

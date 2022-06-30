@@ -155,7 +155,6 @@ class JASMINDailyLowResolution(data.Dataset):
         df = pd.read_csv(root, index_col=0)
         # Filter AOD and Precip values
         if t_var in ["tot_aod", "CAMS_tot_aod", "MERRA_tot_aod"] and filter_aod:
-            print(df.columns)
             # df = df[df[t_var].between(0.07, 1.0)]
             df.loc[~df[t_var].between(0.07, 1.0), y_vars] = np.nan
         if "precip" in df.columns and filter_precip:
@@ -477,18 +476,20 @@ class JASMINDailyHighResolution(data.Dataset):
         self.position = []
         for _, group in _df:
             if len(group) > 1:
-                self.data.append(
-                    self.data_xfm.transform(group[x_vars].to_numpy(dtype="float32"))
-                )
-                self.treatments.append(
-                    self.treatments_xfm.transform(
-                        group[t_var].to_numpy(dtype="float32").reshape(-1, 1)
+                targets = self.targets_xfm.transform(group[y_vars].to_numpy(dtype="float32"))
+                if np.isnan(targets).sum() != (lambda x: x[0]*x[1])(targets.shape): # target is not full of nan
+                    self.data.append(
+                        self.data_xfm.transform(group[x_vars].to_numpy(dtype="float32"))
                     )
-                )
-                self.targets.append(
-                    self.targets_xfm.transform(group[y_vars].to_numpy(dtype="float32"))
-                )
-                self.position.append(group[["lats", "lons"]].to_numpy(dtype="float32"))
+                    self.treatments.append(
+                        self.treatments_xfm.transform(
+                            group[t_var].to_numpy(dtype="float32").reshape(-1, 1)
+                        )
+                    )
+                    self.targets.append(
+                        self.targets_xfm.transform(group[y_vars].to_numpy(dtype="float32"))
+                    )
+                    self.position.append(group[["lats", "lons"]].to_numpy(dtype="float32"))
         # Variable properties
         self.dim_input = self.data[0].shape[-1]
         self.dim_targets = self.targets[0].shape[-1]

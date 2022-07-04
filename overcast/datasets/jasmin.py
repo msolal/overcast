@@ -403,7 +403,7 @@ class JASMINCombo(data.Dataset):
         pad: bool = False,
         bootstrap=False,
     ) -> None:
-        super(JASMINDaily, self).__init__()
+        super(JASMINCombo, self).__init__()
         # Handle default values
         if x_vars is None:
             x_vars = [

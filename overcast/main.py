@@ -418,7 +418,7 @@ def jasmin_combo(
     outcomes = list(outcomes)
     covariates = list(covariates)
     job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin-daily"
+    dataset_name = "jasmin-combo"
     dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
     for c in covariates:
         dataset_folder += f"-{c}"

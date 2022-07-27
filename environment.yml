@@ -1,11 +1,23 @@
 name: overcast
 channels:
   - pytorch
+  - conda-forge
   - defaults
 dependencies:
   - black>=19.1
   - pip>=21.2
-  - python==3.9
+  - python
   - jupyter>=1.0.0
-  - pytorch=1.10.0
-  - cudatoolkit=11.3
+  - pytorch=1.12.0
+  - cudatoolkit=11.6
+  - click 
+  - numpy
+  - scipy
+  - pandas
+  - seaborn
+  - hpbandster
+  - matplotlib
+  - tensorboard
+  - scikit-learn 
+  - ignite
+  - configspace

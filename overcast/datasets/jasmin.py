@@ -7,129 +7,108 @@ from torch.utils import data
 
 from sklearn import preprocessing
 
-# N_PIXELS = 210 # set as median of number of pixels per day for low resolution data
-N_PIXELS = 8564 # set as median of number of pixels per day for high resolution data
+import random
+
+RANDOM_SEED = 42
+N_PIXELS = 210 # median number of pixels per day for low resolution data
+# N_PIXELS = 8564 # median number of pixels per day for high resolution data
+
 
 class JASMIN(data.Dataset):
     def __init__(
         self,
-        root: str,
+        data_dir: str,
+        dataset: str,
         split: str,
-        resolution: str,
-        x_vars: list = None,
-        t_var: str = None,
-        y_vars: list = None,
+        x_vars: list = ["RH850", "RH700", "LTS", "W500", "SST"],
+        t_var: str = "AOD",
+        y_vars: list = ["re", "COD", "CWP"],
         t_bins: int = 2,
         filter_aod: bool = True,
         filter_precip: bool = True,
-        filter_lwp: bool = True,
+        filter_cwp: bool = True,
         filter_re: bool = True,
         bootstrap=False,
     ) -> None:
         super(JASMIN, self).__init__()
-        # Handle default values
-        if x_vars is None:
-            x_vars = (
-                [
-                    "MERRA_RH950",
-                    "MERRA_RH850",
-                    "MERRA_RH700",
-                    "MERRA_LTS",
-                    "MERRA_W500",
-                    "ERA_sst",
-                ]
-                if resolution == "high"
-                else ["RH900", "RH850", "RH700", "LTS", "w500", "whoi_sst", "EIS"]
-            )
-        if y_vars is None:
-            y_vars = (
-                [
-                    "Cloud_Effective_Radius",
-                    "Cloud_Optical_Thickness",
-                    "Cloud_Water_Path",
-                    "Nd",
-                ]
-                if resolution == "high"
-                else ["l_re", "cod", "cwp", "liq_pc"]
-            )
-        if t_var is None: 
-            t_var = "MERRA_aod" if resolution == 'high' else 'tot_aod'
+        # Convert variable names into their keys in the dataset
+        vars_names = pd.read_csv(
+            f"{data_dir}/variables.csv", index_col=0, header=0, na_filter=False
+        ).loc[dataset]
+        x_vars_ds = list(filter(None, list(vars_names[x] for x in x_vars)))
+        t_var_ds = vars_names[t_var]
+        y_vars_ds = list(filter(None, list(vars_names[y] for y in y_vars)))
         # Read csv
-        df = pd.read_csv(root, index_col=0)
-        # Filtering AOD, precipitation, lwp, re
-        if resolution == 'low': 
-            if t_var == 'tot_aod' and filter_aod:
-                df = df[df[t_var].between(0.07, 1.0)]
-            if filter_precip: 
-                df = df[df["precip"] < 0.5]
-            if filter_lwp: 
-                df = df[df["cwp"] < 250]
-            if filter_re: 
-                df = df[df["l_re"] < 30]
-        if resolution == 'high':
-            if t_var == 'MERRA_aod' and filter_aod:
-                df = df[df[t_var].between(0.07, 1.0)]
-            if filter_precip: 
-                df = df[df["imerg_precip"] < 0.5]
-                df = df[df["imerg_precip_T30"] < 0.5]
-                df = df[df["imerg_precip_T60"] < 0.5]
-            if filter_lwp: 
-                df = df[df["Cloud_Water_Path"] < 250]
-            if filter_re: 
-                df = df[df["Cloud_Effective_Radius"] < 30]
-        # if t_var in ["tot_aod", "MERRA_aod"] and filter_aod:
-        #     df = df[df[t_var].between(0.07, 1.0)]
-        # if "precip" in df.columns and filter_precip:
-        #     df = df[df["precip"] < 0.5]
-        # if "imerg_precip" in df.columns and filter_precip:
-        #     df = df[df["imerg_precip"] < 0.5]
-        # if "imerg_precip_T30" in df.columns and filter_precip:
-        #     df = df[df["imerg_precip_T30"] < 0.5]
-        # if "imerg_precip_T60" in df.columns and filter_precip:
-        #     df = df[df["imerg_precip_T60"] < 0.5]
-        # Filter lwp values
-        # if "cwp" in df.columns and filter_lwp: 
-        #     df = df[df["cwp"] < 250]
-        # if "Cloud_Water_Path" in df.columns and filter_lwp: 
-        #     df = df[df["Cloud_Water_Path"] < 250]
-        # # Filter re values
-        # if "l_re" in df.columns and filter_re: 
-        #     df = df[df["l_re"] < 30]
-        # if "Cloud_Effective_Radius" in df.columns and filter_re: 
-        #     df = df[df["Cloud_Effective_Radius"] < 30]
+        df = pd.read_csv(f"{data_dir}/{dataset}.csv", index_col=0)
+        # df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        # df.dropna()
+        # Filtering AOD
+        if t_var == "AOD" and filter_aod:
+            df = df[df[t_var_ds].between(0.03, 0.3)]
+        # Filter precipitation
+        if filter_precip:
+            precip_vars = list(
+                filter(
+                    None,
+                    list(
+                        vars_names[p]
+                        for p in [
+                            "precipitation",
+                            "precipitation_T30",
+                            "precipitation_T60",
+                        ]
+                    ),
+                )
+            )
+            for precip_var in precip_vars:
+                df = df[df[precip_var] < 0.5]
+        # Filter lwp
+        if filter_cwp:
+            df = df[df[vars_names["CWP"]] < 250]
+        # Filter re
+        if filter_re:
+            re_var = vars_names["re"]
+            df = df[df[re_var] < 30]
+        # Convert time stamps into separate date and time columns
+        timestamp_ds = vars_names["timestamp"]
+        if df.dtypes[timestamp_ds] == "float64":  # if timestamp, convert to datetime
+            df[timestamp_ds] = df[timestamp_ds].apply(datetime.fromtimestamp)
+        df["date"] = pd.to_datetime(df[timestamp_ds]).apply(datetime.date)
+        df["time"] = pd.to_datetime(df[timestamp_ds]).apply(datetime.time)
         # Make train test valid split
-        if resolution == 'high': 
-            df['dates'] = pd.to_datetime(df['dates']).apply(datetime.date)
-        times = "timestamp" if resolution == "low" else "dates"
-        days = df[times].unique()
+        days = df["date"].unique()
+        random.seed(RANDOM_SEED)
+        random.shuffle(days)
         days_valid = set(days[5::7])
         days_test = set(days[6::7])
         days_train = set(days).difference(days_valid.union(days_test))
         # Fit preprocessing transforms
-        df_train = df[df[times].isin(days_train)]
+        df_train = df[df["date"].isin(days_train)]
         self.data_xfm = preprocessing.StandardScaler()
-        self.data_xfm.fit(df_train[x_vars].to_numpy())
+        self.data_xfm.fit(df_train[x_vars_ds].to_numpy())
         self.treatments_xfm = (
             preprocessing.KBinsDiscretizer(n_bins=t_bins, encode="onehot-dense")
             if t_bins > 1
             else preprocessing.StandardScaler()
         )
-        self.treatments_xfm.fit(df_train[t_var].to_numpy().reshape(-1, 1))
+        self.treatments_xfm.fit(df_train[t_var_ds].to_numpy().reshape(-1, 1))
         self.targets_xfm = preprocessing.StandardScaler()
-        self.targets_xfm.fit(df_train[y_vars].to_numpy())
+        self.targets_xfm.fit(df_train[y_vars_ds].to_numpy())
         # Split the data
         if split == "train":
-            _df = df[df[times].isin(days_train)]
+            _df = df[df["date"].isin(days_train)]
         elif split == "valid":
-            _df = df[df[times].isin(days_valid)]
+            _df = df[df["date"].isin(days_valid)]
         elif split == "test":
-            _df = df[df[times].isin(days_test)]
+            _df = df[df["date"].isin(days_test)]
         # Set variables
-        self.data = self.data_xfm.transform(_df[x_vars].to_numpy(dtype="float32"))
+        self.data = self.data_xfm.transform(_df[x_vars_ds].to_numpy(dtype="float32"))
         self.treatments = self.treatments_xfm.transform(
-            _df[t_var].to_numpy(dtype="float32").reshape(-1, 1)
+            _df[t_var_ds].to_numpy(dtype="float32").reshape(-1, 1)
         )
-        self.targets = self.targets_xfm.transform(_df[y_vars].to_numpy(dtype="float32"))
+        self.targets = self.targets_xfm.transform(
+            _df[y_vars_ds].to_numpy(dtype="float32")
+        )
         # Variable properties
         self.dim_input = self.data.shape[-1]
         self.dim_targets = self.targets.shape[-1]
@@ -178,121 +157,90 @@ class JASMIN(data.Dataset):
 class JASMINDaily(data.Dataset):
     def __init__(
         self,
-        root: str,
+        data_dir: str,
+        dataset: str,
         split: str,
-        resolution: str,
-        x_vars: list = None,
-        t_var: str = None,
-        y_vars: list = None,
+        x_vars: list = ["RH900", "RH850", "RH700", "LTS", "W500", "SST", "EIS"],
+        t_var: str = "AOD",
+        y_vars: list = ["re", "COD", "CWP"],
         t_bins: int = 2,
         filter_aod: bool = True,
         filter_precip: bool = True,
-        filter_lwp: bool = True,
-        filter_re: bool = True, 
+        filter_cwp: bool = True,
+        filter_re: bool = True,
         pad: bool = False,
         bootstrap=False,
     ) -> None:
         super(JASMINDaily, self).__init__()
-        # Handle default values
-        if x_vars is None:
-            x_vars = (
-                [
-                    "MERRA_RH950",
-                    "MERRA_RH850",
-                    "MERRA_RH700",
-                    "MERRA_LTS",
-                    "MERRA_W500",
-                    "ERA_sst",
-                ]
-                if resolution == "high"
-                else ["RH900", "RH850", "RH700", "LTS", "w500", "whoi_sst", "EIS"]
-            )
-        if y_vars is None:
-            y_vars = (
-                [
-                    "Cloud_Effective_Radius",
-                    "Cloud_Optical_Thickness",
-                    "Cloud_Water_Path",
-                    "Nd",
-                ]
-                if resolution == "high"
-                else ["l_re", "cod", "cwp", "liq_pc"]
-            )
-        if t_var is None: 
-            t_var = "MERRA_aod" if resolution == 'high' else 'tot_aod'
+        # Convert variables into their name from the dataset
+        vars_names = pd.read_csv(
+            f"{data_dir}/variables.csv", index_col=0, header=0, na_filter=False
+        ).loc[dataset]
+        x_vars_ds = list(filter(None, list(vars_names[x] for x in x_vars)))
+        t_var_ds = vars_names[t_var]
+        y_vars_ds = list(filter(None, list(vars_names[y] for y in y_vars)))
         # Read csv
-        df = pd.read_csv(root, index_col=0)
-        # Filtering AOD, precipitation, lwp, re
-        if resolution == 'low': 
-            if t_var == 'tot_aod' and filter_aod:
-                df.loc[~df[t_var].between(0.07, 1.0), y_vars] = np.nan
-            if filter_precip: 
-                df.loc[df["precip"] >= 0.5, y_vars] = np.nan
-            if filter_lwp: 
-                df.loc[df["cwp"] >= 250, y_vars] = np.nan
-            if filter_re: 
-                df.loc[df["l_re"] >= 30, y_vars] = np.nan
-        if resolution == 'high':
-            if t_var == 'MERRA_aod' and filter_aod:
-                df.loc[~df[t_var].between(0.07, 1.0), y_vars] = np.nan
-            if filter_precip: 
-                df.loc[df["imerg_precip"] >= 0.5, y_vars] = np.nan
-                df.loc[df["imerg_precip_T30"] >= 0.5, y_vars] = np.nan
-                df.loc[df["imerg_precip_T60"] >= 0.5, y_vars] = np.nan
-            if filter_lwp: 
-                df.loc[df["Cloud_Water_Path"] >= 250, y_vars] = np.nan
-            if filter_re: 
-                df.loc[df["Cloud_Effective_Radius"] >= 30, y_vars] = np.nan
-        # # Filter AOD values
-        # if t_var in ["tot_aod", "MERRA_aod"] and filter_aod:
-        #     df.loc[~df[t_var].between(0.07, 1.0), y_vars] = np.nan
-        # # Filter precipitation values
-        # if "precip" in df.columns and filter_precip:
-        #     df.loc[df["precip"] >= 0.5, y_vars] = np.nan
-        # if "imerg_precip" in df.columns and filter_precip:
-        #     df.loc[df["imerg_precip"] >= 0.5, y_vars] = np.nan
-        # if "imerg_precip_T30" in df.columns and filter_precip:
-        #     df.loc[df["imerg_precip_T30"] >= 0.5, y_vars] = np.nan
-        # if "imerg_precip_T60" in df.columns and filter_precip:
-        #     df.loc[df["imerg_precip_T60"] >= 0.5, y_vars] = np.nan
-        # # Filter lwp values
-        # if "cwp" in df.columns and filter_lwp: 
-        #     df.loc[df["cwp"] >= 250, y_vars] = np.nan
-        # if "Cloud_Water_Path" in df.columns and filter_lwp: 
-        #     df.loc[df["Cloud_Water_Path"] >= 250, y_vars] = np.nan
-        # # Filter re values
-        # if "l_re" in df.columns and filter_re: 
-        #     df.loc[df["l_re"] >= 30, y_vars] = np.nan
-        # if "Cloud_Effective_Radius" in df.columns and filter_re: 
-        #     df.loc[df["Cloud_Effective_Radius"] >= 30, y_vars] = np.nan
+        df = pd.read_csv(f"{data_dir}/{dataset}.csv", index_col=0)
+        # df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        # Filtering AOD
+        if t_var == "AOD" and filter_aod:
+            df.loc[~df[t_var_ds].between(0.03, 0.3), y_vars_ds] = np.nan
+        # Filter precipitation
+        if filter_precip:
+            precip_vars = list(
+                filter(
+                    None,
+                    list(
+                        vars_names[p]
+                        for p in [
+                            "precipitation",
+                            "precipitation_T30",
+                            "precipitation_T60",
+                        ]
+                    ),
+                )
+            )
+            for precip_var in precip_vars:
+                df.loc[df[precip_var] >= 0.5, y_vars_ds] = np.nan
+        # Filter lwp
+        if filter_cwp:
+            df.loc[df[vars_names["CWP"]] >= 250, y_vars_ds] = np.nan
+        # Filter re
+        if filter_re:
+            df.loc[df[vars_names["re"]] >= 30, y_vars_ds] = np.nan
+        # Convert time stamps into separate date and time columns
+        timestamp_ds = vars_names["timestamp"]
+        if df.dtypes[timestamp_ds] == "float64":  # if timestamp, convert to datetime
+            df[timestamp_ds] = df[timestamp_ds].apply(datetime.fromtimestamp)
+        df["date"] = pd.to_datetime(df[timestamp_ds]).apply(datetime.date)
+        df["time"] = pd.to_datetime(df[timestamp_ds]).apply(datetime.time)
         # Make train test valid split
-        if 'dates' in df.columns: 
-            df['dates'] = pd.to_datetime(df['dates']).apply(datetime.date)
-        times = "timestamp" if resolution == "low" else "dates"
-        days = df[times].unique()
+        days = df["date"].unique()
+        random.seed(RANDOM_SEED)
+        random.shuffle(days)
         days_valid = set(days[5::7])
         days_test = set(days[6::7])
         days_train = set(days).difference(days_valid.union(days_test))
         # Fit preprocessing transforms
-        df_train = df[df[times].isin(days_train)]
+        df_train = df[df["date"].isin(days_train)]
         self.data_xfm = preprocessing.StandardScaler()
-        self.data_xfm.fit(df_train[x_vars].to_numpy())
+        self.data_xfm.fit(df_train[x_vars_ds].to_numpy())
         self.treatments_xfm = (
             preprocessing.KBinsDiscretizer(n_bins=t_bins, encode="onehot-dense")
             if t_bins > 1
             else preprocessing.StandardScaler()
         )
-        self.treatments_xfm.fit(df_train[t_var].to_numpy().reshape(-1, 1))
+        self.treatments_xfm.fit(df_train[t_var_ds].to_numpy().reshape(-1, 1))
         self.targets_xfm = preprocessing.StandardScaler()
-        self.targets_xfm.fit(df_train[y_vars].to_numpy())
+        self.targets_xfm.fit(df_train[y_vars_ds].to_numpy())
         # Split the data
         if split == "train":
-            _df = df[df[times].isin(days_train)]
+            _df = df[df["date"].isin(days_train)]
         elif split == "valid":
-            _df = df[df[times].isin(days_valid)]
+            _df = df[df["date"].isin(days_valid)]
         elif split == "test":
-            _df = df[df[times].isin(days_test)]
-        _df = _df.groupby(times)
+            _df = df[df["date"].isin(days_test)]
+        _df = _df.groupby("date")
         # Set variables
         self.data = []
         self.treatments = []
@@ -300,20 +248,30 @@ class JASMINDaily(data.Dataset):
         self.position = []
         for _, group in _df:
             if len(group) > 1:
-                targets = self.targets_xfm.transform(group[y_vars].to_numpy(dtype="float32"))
-                if np.isnan(targets).sum() != (lambda x: x[0]*x[1])(targets.shape): # target is not full of nan
+                targets = self.targets_xfm.transform(
+                    group[y_vars_ds].to_numpy(dtype="float32")
+                )
+                if ~np.isnan(targets).all():  # target is not full of nan
                     self.data.append(
-                        self.data_xfm.transform(group[x_vars].to_numpy(dtype="float32"))
+                        self.data_xfm.transform(
+                            group[x_vars_ds].to_numpy(dtype="float32")
+                        )
                     )
                     self.treatments.append(
                         self.treatments_xfm.transform(
-                            group[t_var].to_numpy(dtype="float32").reshape(-1, 1)
+                            group[t_var_ds].to_numpy(dtype="float32").reshape(-1, 1)
                         )
                     )
                     self.targets.append(
-                        self.targets_xfm.transform(group[y_vars].to_numpy(dtype="float32"))
+                        self.targets_xfm.transform(
+                            group[y_vars_ds].to_numpy(dtype="float32")
+                        )
                     )
-                    self.position.append(group[["lats", "lons"]].to_numpy(dtype="float32"))
+                    self.position.append(
+                        group[[vars_names["lats"], vars_names["lons"]]].to_numpy(
+                            dtype="float32"
+                        )
+                    )
         # Variable properties
         self.dim_input = self.data[0].shape[-1]
         self.dim_targets = self.targets[0].shape[-1]
@@ -338,7 +296,7 @@ class JASMINDaily(data.Dataset):
             self.data = [self.data[j] for j in sample_index]
             self.treatments = [self.treatments[j] for j in sample_index]
             self.targets = [self.targets[j] for j in sample_index]
-            self.position = [self.position[j] for j in sample_index]
+            self.position = [self.position[j] for j in sample_index] 
 
     @property
     def data_frame(self):
@@ -389,81 +347,107 @@ class JASMINDaily(data.Dataset):
 class JASMINCombo(data.Dataset):
     def __init__(
         self,
-        root_lr: str,
-        root_hr: str,
+        data_dir: str,
+        lr_dataset: str,
+        hr_dataset: str,
         split: str,
-        x_vars: list = None,
-        t_var: str = None,
-        y_vars: list = None,
+        x_vars: list = ["RH900", "RH850", "RH700", "LTS", "W500", "SST", "EIS"],
+        t_var: str = "AOD",
+        y_vars: list = ["re", "COD", "CWP"],
         t_bins: int = 2,
         filter_aod: bool = True,
         filter_precip: bool = True,
-        filter_lwp: bool = True,
-        filter_re: bool = True, 
+        filter_cwp: bool = True,
+        filter_re: bool = True,
         pad: bool = False,
         bootstrap=False,
     ) -> None:
         super(JASMINCombo, self).__init__()
-        # Handle default values
-        if x_vars is None:
-            x_vars = [
-                "MERRA_RH950",
-                "MERRA_RH850",
-                "MERRA_RH700",
-                "MERRA_LTS",
-                "MERRA_W500",
-                "ERA_sst",
-            ]
-        if y_vars is None:
-            y_vars = ["l_re", "cod", "cwp", "liq_pc"]
-        if t_var is None: 
-            t_var = 'tot_aod'
+        # Convert variables into their name from the dataset
+        hr_vars_names = pd.read_csv(
+            f"{data_dir}/variables.csv", index_col=0, header=0, na_filter=False
+        ).loc[hr_dataset]
+        lr_vars_names = pd.read_csv(
+            f"{data_dir}/variables.csv", index_col=0, header=0, na_filter=False
+        ).loc[lr_dataset]
+        x_vars_lr = list(filter(None, list(lr_vars_names[x] for x in x_vars)))
+        t_var_lr = lr_vars_names[t_var]
+        y_vars_lr = list(filter(None, list(lr_vars_names[y] for y in y_vars)))
+        x_vars_hr = list(filter(None, list(hr_vars_names[x] for x in x_vars)))
+        t_var_hr = hr_vars_names[t_var]
+        y_vars_hr = list(filter(None, list(hr_vars_names[y] for y in y_vars)))
         # Read csv
-        hr = pd.read_csv(root_hr, index_col=0)
-        lr = pd.read_csv(root_lr, index_col=0)
-        # Filtering AOD, precipitation, lwp, re
-        if t_var == 'tot_aod' and filter_aod:
-            lr.loc[~lr[t_var].between(0.07, 1.0), y_vars] = np.nan
-        if filter_precip: 
-            lr.loc[lr["precip"] >= 0.5, y_vars] = np.nan
-        if filter_lwp: 
-            lr.loc[lr["cwp"] >= 250, y_vars] = np.nan
-        if filter_re: 
-            lr.loc[lr["l_re"] >= 30, y_vars] = np.nan
+        hr = pd.read_csv(f"{data_dir}/{hr_dataset}.csv", index_col=0)
+        lr = pd.read_csv(f"{data_dir}/{lr_dataset}.csv", index_col=0)
+        # Filtering AOD
+        if t_var == "AOD" and filter_aod:
+            lr.loc[~lr[t_var_lr].between(0.03, 0.3), y_vars_lr] = np.nan
+            hr.loc[~hr[t_var_hr].between(0.03, 0.3), y_vars_hr] = np.nan
+        # Filter precipitation
+        if filter_precip:
+            precip_list = [
+                "precipitation",
+                "precipitation_T30",
+                "precipitation_T60",
+            ]
+            precip_vars_lr = list(
+                filter(None, list(lr_vars_names[p] for p in precip_list))
+            )
+            for precip_var in precip_vars_lr:
+                lr.loc[lr[precip_var] >= 0.5, y_vars_lr] = np.nan
+            precip_vars_hr = list(
+                filter(None, list(hr_vars_names[p] for p in precip_list))
+            )
+            for precip_var in precip_vars_hr:
+                hr.loc[hr[precip_var] >= 0.5, y_vars_hr] = np.nan
+        # Filter lwp
+        if filter_cwp:
+            lr.loc[lr[lr_vars_names["CWP"]] >= 250, y_vars_lr] = np.nan
+            hr.loc[hr[hr_vars_names["CWP"]] >= 250, y_vars_hr] = np.nan
+        # Filter re
+        if filter_re:
+            lr.loc[lr[lr_vars_names["re"]] >= 30, y_vars_lr] = np.nan
+            hr.loc[hr[hr_vars_names["re"]] >= 30, y_vars_hr] = np.nan
         # Make train test valid split
-        hr['dates'] = pd.to_datetime(hr['dates'])
-        hr['dates_only'] = hr['dates'].apply(datetime.date)
-        hr['hours_only'] = hr['dates'].apply(datetime.time).apply(lambda x: x.hour)
-        lr['dates_only'] = lr['timestamp'].apply(datetime.fromtimestamp)
-        days = hr['dates_only'].unique()
+        timestamp_lr = lr_vars_names["timestamp"]
+        timestamp_hr = hr_vars_names["timestamp"]
+        if lr.dtypes[timestamp_lr] == "float64":  # if timestamp, convert to datetime
+            lr[timestamp_lr] = lr[timestamp_lr].apply(datetime.fromtimestamp)
+        if hr.dtypes[timestamp_hr] == "float64":  # if timestamp, convert to datetime
+            hr[timestamp_hr] = lr[timestamp_hr].apply(datetime.fromtimestamp)
+        lr["date"] = pd.to_datetime(lr[timestamp_lr]).apply(datetime.date)
+        hr["date"] = pd.to_datetime(hr[timestamp_hr]).apply(datetime.date)
+        hr["time"] = pd.to_datetime(hr[timestamp_hr]).apply(datetime.time)
+        hr["hour"] = hr["time"].apply(lambda x: x.hour)
+        days = hr["date"].unique()
         days_valid = set(days[5::7])
         days_test = set(days[6::7])
         days_train = set(days).difference(days_valid.union(days_test))
         # Fit preprocessing transforms
-        lr_df_train = lr[lr['dates_only'].isin(days_train)]
-        hr_df_train = hr[hr['dates_only'].isin(days_train)]
+        lr_df_train = lr[lr["date"].isin(days_train)]
+        hr_df_train = hr[hr["date"].isin(days_train)]
         self.data_xfm = preprocessing.StandardScaler()
-        self.data_xfm.fit(hr_df_train[x_vars].to_numpy())
+        self.data_xfm.fit(hr_df_train[x_vars_hr].to_numpy())
         self.treatments_xfm = (
             preprocessing.KBinsDiscretizer(n_bins=t_bins, encode="onehot-dense")
             if t_bins > 1
             else preprocessing.StandardScaler()
         )
-        self.treatments_xfm.fit(lr_df_train[t_var].to_numpy().reshape(-1, 1))
+        self.treatments_xfm.fit(lr_df_train[t_var_lr].to_numpy().reshape(-1, 1))
         self.targets_xfm = preprocessing.StandardScaler()
-        self.targets_xfm.fit(lr_df_train[y_vars].to_numpy())
+        self.targets_xfm.fit(lr_df_train[y_vars_lr].to_numpy())
         # Split the data
         if split == "train":
-            _lr = lr[lr['dates_only'].isin(days_train)]
-            _hr = hr[hr['dates_only'].isin(days_train)]
+            _lr = lr[lr["date"].isin(days_train)]
+            _hr = hr[hr["date"].isin(days_train)]
         elif split == "valid":
-            _lr = lr[lr['dates_only'].isin(days_valid)]
-            _hr = hr[hr['dates_only'].isin(days_valid)]
+            _lr = lr[lr["date"].isin(days_valid)]
+            _hr = hr[hr["date"].isin(days_valid)]
         elif split == "test":
-            _lr = lr[lr['dates_only'].isin(days_test)]
-            _hr = hr[hr['dates_only'].isin(days_test)]        
-        _lr = _lr.groupby('dates_only')
-        _hr = _hr.groupby('dates_only')
+            _lr = lr[lr["date"].isin(days_test)]
+            _hr = hr[hr["date"].isin(days_test)]
+        _lr = _lr.groupby("date")
+        _hr = _hr.groupby("date")
         # Set variables
         self.data = []
         self.treatments = []
@@ -471,17 +455,19 @@ class JASMINCombo(data.Dataset):
         self.position = []
         for _, group in _hr:
             self.data.append(
-                self.data_xfm.transform(group[x_vars].to_numpy(dtype="float32"))
+                self.data_xfm.transform(group[x_vars_hr].to_numpy(dtype="float32"))
             )
-            self.position.append(group[["lats", "lons", "hours_only"]].to_numpy(dtype="float32"))
+            self.position.append(
+                group[[hr_vars_names["lats"], hr_vars_names["lons"], "hour"]].to_numpy(dtype="float32")
+            )
         for _, group in _lr:
             self.treatments.append(
                 self.treatments_xfm.transform(
-                    group[t_var].to_numpy(dtype="float32").reshape(-1, 1)
+                    group[t_var_lr].to_numpy(dtype="float32").reshape(-1, 1)
                 )
             )
             self.targets.append(
-                self.targets_xfm.transform(group[y_vars].to_numpy(dtype="float32"))
+                self.targets_xfm.transform(group[y_vars_lr].to_numpy(dtype="float32"))
             )
         # Variable properties
         self.dim_input = self.data[0].shape[-1]
@@ -535,15 +521,15 @@ class JASMINCombo(data.Dataset):
         position = self.position[index]
         if self.pad:
             num_samples = covariates.shape[0]
-            if num_samples < N_PIXELS:
-                diff = N_PIXELS - num_samples
+            if num_samples < 210:
+                diff = 210 - num_samples
                 pading = ((0, diff), (0, 0))
                 covariates = np.pad(covariates, pading, constant_values=np.nan)
                 treatments = np.pad(treatments, pading, constant_values=np.nan)
                 targets = np.pad(targets, pading, constant_values=np.nan)
                 position = np.pad(position, pading, constant_values=np.nan)
-            elif num_samples > N_PIXELS:
-                sample = np.random.choice(np.arange(num_samples), N_PIXELS, replace=False)
+            elif num_samples > 210:
+                sample = np.random.choice(np.arange(num_samples), 210, replace=False)
                 sample.sort()
                 covariates = covariates[sample]
                 treatments = treatments[sample]

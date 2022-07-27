@@ -7,12 +7,10 @@ from pathlib import Path
 
 from overcast import workflows
 
-
 @click.group(chain=True)
 @click.pass_context
 def cli(context):
     context.obj = {"n_gpu": cuda.device_count()}
-
 
 @cli.command("train")
 @click.option(
@@ -36,9 +34,11 @@ def train(
 ):
     ray.init(
         num_gpus=context.obj["n_gpu"],
-        dashboard_host="127.0.0.1",
+        # dashboard_host="127.0.0.1",
         ignore_reinit_error=True,
         object_store_memory=8000000000,
+        include_dashboard=False,
+        # num_cpus=4,
     )
     context.obj.update(
         {
@@ -48,7 +48,6 @@ def train(
             "mode": "train",
         }
     )
-
 
 @cli.command("tune")
 @click.option(
@@ -92,33 +91,38 @@ def tune(
         }
     )
 
-
 @cli.command("jasmin")
 @click.pass_context
 @click.option(
-    "--root", type=str, required=True, help="location of dataset",
+    "--data-dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, resolve_path=True),
+    required=True,
+    help="location of dataset directory",
 )
 @click.option(
-    "--resolution", type=str, required=True, help='resolution of dataset',
+    "--dataset",
+    type=str,
+    required=True,
+    help="name of dataset (dataset should be a csv)",
 )
 @click.option(
     "--covariates",
     "-c",
     type=str,
     multiple=True,
-    default=None,
-    help="covariate keys",
+    default=["RH850", "RH700", "LTS", "W500", "SST"],
+    help="covariate names",
 )
 @click.option(
-    "--treatment", "-t", type=str, default=None, help="treatment key",
+    "--treatment", "-t", type=str, default="AOD", help="treatment names",
 )
 @click.option(
     "--outcomes",
     "-o",
     type=str,
     multiple=True,
-    default=None,
-    help="outcome keys",
+    default=["re", "COD", "CWP"],
+    help="outcome names",
 )
 @click.option(
     "--num-bins",
@@ -133,13 +137,13 @@ def tune(
     help="Filter out aod values less than 0.07 and greater than 1",
 )
 @click.option(
-    "--filter-precip", type=bool, default=True, help="Filter out raining clouds",
+    "--filter-precip", type=bool, default=True, help="Filter out raining clouds (0.5)",
 )
 @click.option(
-    "--filter-lwp", type=bool, default=True, help="Filter cloud water path",
+    "--filter-cwp", type=bool, default=True, help="Filter cloud water path (250)",
 )
 @click.option(
-    "--filter-re", type=bool, default=True, help="Filter cloud effective radius",
+    "--filter-re", type=bool, default=True, help="Filter cloud effective radius (30)",
 )
 @click.option(
     "--bootstrap",
@@ -149,23 +153,23 @@ def tune(
 )
 def jasmin(
     context,
-    root,
-    resolution,
+    data_dir,
+    dataset,
     covariates,
     treatment,
     outcomes,
     num_bins,
     filter_aod,
     filter_precip,
-    filter_lwp, 
+    filter_cwp,
     filter_re,
     bootstrap,
 ):
     outcomes = list(outcomes)
     covariates = list(covariates)
     job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin"
-    dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
+    dataset_name = f"jasmin"
+    dataset_folder = dataset_name + f"-{dataset}_treatment-{treatment}_covariates"
     for c in covariates:
         dataset_folder += f"-{c}"
     dataset_folder += "_outcomes"
@@ -178,44 +182,44 @@ def jasmin(
             "dataset_name": dataset_name,
             "experiment_dir": str(experiment_dir),
             "ds_train": {
-                "root": root,
+                "data_dir": data_dir,
+                "dataset": dataset,
                 "split": "train",
-                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
                 "bootstrap": bootstrap,
             },
             "ds_valid": {
-                "root": root,
+                "data_dir": data_dir,
+                "dataset": dataset,
                 "split": "valid",
-                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
                 "bootstrap": False,
             },
             "ds_test": {
-                "root": root,
+                "data_dir": data_dir,
+                "dataset": dataset,
                 "split": "test",
-                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
                 "bootstrap": False,
             },
@@ -226,30 +230,41 @@ def jasmin(
 @cli.command("jasmin-daily")
 @click.pass_context
 @click.option(
-    "--root", type=str, required=True, help="location of dataset",
+    "--data-dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, resolve_path=True),
+    required=True,
+    help="location of dataset directory",
 )
 @click.option(
-    "--resolution", type=str, required=True, help='resolution of dataset',
+    "--dataset",
+    type=str,
+    required=True,
+    help="name of dataset (dataset should be a csv)",
 )
 @click.option(
     "--covariates",
     "-c",
     type=str,
     multiple=True,
-    default=None,
-    help="covariate keys",
+    default=["RH850", "RH700", "LTS", "W500", "SST"],
+    help="covariate names",
 )
 @click.option(
-    "--treatment", "-t", type=str, default=None, help="treatment key",
+    "--treatment", "-t", type=str, default="AOD", help="treatment names",
 )
 @click.option(
-    "--outcomes", "-o", type=str, multiple=True, default=None, help="outcome keys",
+    "--outcomes",
+    "-o",
+    type=str,
+    multiple=True,
+    default=["re", "COD", "CWP"],
+    help="outcome names",
 )
 @click.option(
     "--num-bins",
     type=int,
     default=1,
-    help="Number of bins to discretize treatment variable, default=2",
+    help="Number of bins to discretize treatment variable, default=1 (treatment is continuous)",
 )
 @click.option(
     "--filter-aod",
@@ -258,13 +273,13 @@ def jasmin(
     help="Filter out aod values less than 0.07 and greater than 1",
 )
 @click.option(
-    "--filter-precip", type=bool, default=True, help="Filter out raining clouds",
+    "--filter-precip", type=bool, default=True, help="Filter out raining clouds (0.5)",
 )
 @click.option(
-    "--filter-lwp", type=bool, default=True, help="Filter cloud water path",
+    "--filter-cwp", type=bool, default=True, help="Filter cloud water path (250)",
 )
 @click.option(
-    "--filter-re", type=bool, default=True, help="Filter cloud effective radius",
+    "--filter-re", type=bool, default=True, help="Filter cloud effective radius (30)",
 )
 @click.option(
     "--bootstrap",
@@ -274,76 +289,75 @@ def jasmin(
 )
 def jasmin_daily(
     context,
-    root,
-    resolution,
+    data_dir,
+    dataset,
     covariates,
     treatment,
     outcomes,
     num_bins,
     filter_aod,
     filter_precip,
-    filter_lwp, 
+    filter_cwp,
     filter_re,
     bootstrap,
 ):
     outcomes = list(outcomes)
     covariates = list(covariates)
     job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin-daily"
-    dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
+    dataset_name = f"jasmin-daily"
+    dataset_folder = dataset_name + f"-{dataset}_treatment-{treatment}_covariates"
     for c in covariates:
         dataset_folder += f"-{c}"
     dataset_folder += "_outcomes"
     for o in outcomes:
         dataset_folder += f"-{o}"
     dataset_folder += f"_bins-{num_bins}"
-    dataset_folder += f"_bs-{bootstrap}"
     experiment_dir = job_dir / dataset_folder
     context.obj.update(
         {
             "dataset_name": dataset_name,
             "experiment_dir": str(experiment_dir),
             "ds_train": {
-                "root": root,
+                "data_dir": data_dir,
+                "dataset": dataset,
                 "split": "train",
-                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
-                "pad": True, 
+                "pad": True,
                 "bootstrap": bootstrap,
             },
             "ds_valid": {
-                "root": root,
+                "data_dir": data_dir,
+                "dataset": dataset,
                 "split": "valid",
-                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
                 "pad": True,
                 "bootstrap": False,
             },
             "ds_test": {
-                "root": root,
+                "data_dir": data_dir,
+                "dataset": dataset,
                 "split": "test",
-                "resolution": resolution,
                 "x_vars": covariates,
                 "t_var": treatment,
                 "y_vars": outcomes,
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
                 "pad": False,
                 "bootstrap": False,
@@ -355,30 +369,47 @@ def jasmin_daily(
 @cli.command("jasmin-combo")
 @click.pass_context
 @click.option(
-    "--root-lr", type=str, required=True, help="location of low resolution dataset",
+    "--data-dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, resolve_path=True),
+    required=True,
+    help="location of dataset directory",
 )
 @click.option(
-    "--root-hr", type=str, required=True, help="location of high resolution dataset",
+    "--lr-dataset",
+    type=str,
+    required=True,
+    help="name of the low resolution dataset (dataset should be a csv)",
+)
+@click.option(
+    "--hr-dataset",
+    type=str,
+    required=True,
+    help="name of the high resolution dataset (dataset should be a csv)",
 )
 @click.option(
     "--covariates",
     "-c",
     type=str,
     multiple=True,
-    default=None,
-    help="covariate keys",
+    default=["RH850", "RH700", "LTS", "W500", "SST"],
+    help="covariate names",
 )
 @click.option(
-    "--treatment", "-t", type=str, default=None, help="treatment key",
+    "--treatment", "-t", type=str, default="AOD", help="treatment names",
 )
 @click.option(
-    "--outcomes", "-o", type=str, multiple=True, default=None, help="outcome keys",
+    "--outcomes",
+    "-o",
+    type=str,
+    multiple=True,
+    default=["Nd", "re", "COD", "CWP"],
+    help="outcome names",
 )
 @click.option(
     "--num-bins",
     type=int,
     default=1,
-    help="Number of bins to discretize treatment variable, default=2",
+    help="Number of bins to discretize treatment variable, default=1 (treatment is continuous)",
 )
 @click.option(
     "--filter-aod",
@@ -387,13 +418,13 @@ def jasmin_daily(
     help="Filter out aod values less than 0.07 and greater than 1",
 )
 @click.option(
-    "--filter-precip", type=bool, default=True, help="Filter out raining clouds",
+    "--filter-precip", type=bool, default=True, help="Filter out raining clouds (0.5)",
 )
 @click.option(
-    "--filter-lwp", type=bool, default=True, help="Filter cloud water path",
+    "--filter-cwp", type=bool, default=True, help="Filter cloud water path (250)",
 )
 @click.option(
-    "--filter-re", type=bool, default=True, help="Filter cloud effective radius",
+    "--filter-re", type=bool, default=True, help="Filter cloud effective radius (30)",
 )
 @click.option(
     "--bootstrap",
@@ -403,38 +434,39 @@ def jasmin_daily(
 )
 def jasmin_combo(
     context,
-    root_lr,
-    root_hr,
+    data_dir,
+    lr_dataset,
+    hr_dataset,
     covariates,
     treatment,
     outcomes,
     num_bins,
     filter_aod,
     filter_precip,
-    filter_lwp, 
+    filter_cwp,
     filter_re,
     bootstrap,
 ):
     outcomes = list(outcomes)
     covariates = list(covariates)
     job_dir = Path(context.obj.get("job_dir"))
-    dataset_name = "jasmin-combo"
-    dataset_folder = dataset_name + f"_treatment-{treatment}_covariates"
+    dataset_name = f"jasmin-combo"
+    dataset_folder = dataset_name + f"-{lr_dataset}-{hr_dataset}_treatment-{treatment}_covariates"
     for c in covariates:
         dataset_folder += f"-{c}"
     dataset_folder += "_outcomes"
     for o in outcomes:
         dataset_folder += f"-{o}"
     dataset_folder += f"_bins-{num_bins}"
-    dataset_folder += f"_bs-{bootstrap}"
     experiment_dir = job_dir / dataset_folder
     context.obj.update(
         {
             "dataset_name": dataset_name,
             "experiment_dir": str(experiment_dir),
             "ds_train": {
-                "root_lr": root_lr,
-                "root_hr": root_hr,
+                "data_dir": data_dir,
+                "lr_dataset": lr_dataset,
+                "hr_dataset": hr_dataset,
                 "split": "train",
                 "x_vars": covariates,
                 "t_var": treatment,
@@ -442,14 +474,15 @@ def jasmin_combo(
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
-                "pad": True, 
+                "pad": True,
                 "bootstrap": bootstrap,
             },
             "ds_valid": {
-                "root_lr": root_lr,
-                "root_hr": root_hr,
+                "data_dir": data_dir,
+                "lr_dataset": lr_dataset,
+                "hr_dataset": hr_dataset,
                 "split": "valid",
                 "x_vars": covariates,
                 "t_var": treatment,
@@ -457,14 +490,15 @@ def jasmin_combo(
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
-                "pad": True, 
+                "pad": True,
                 "bootstrap": False,
             },
             "ds_test": {
-                "root_lr": root_lr,
-                "root_hr": root_hr,
+                "data_dir": data_dir,
+                "lr_dataset": lr_dataset,
+                "hr_dataset": hr_dataset,
                 "split": "test",
                 "x_vars": covariates,
                 "t_var": treatment,
@@ -472,14 +506,13 @@ def jasmin_combo(
                 "t_bins": num_bins,
                 "filter_aod": filter_aod,
                 "filter_precip": filter_precip,
-                "filter_lwp": filter_lwp,
+                "filter_cwp": filter_cwp,
                 "filter_re": filter_re,
-                "pad": False, 
+                "pad": False,
                 "bootstrap": False,
             },
         }
     )
-
 
 
 @cli.command("dose-response")
@@ -845,7 +878,7 @@ def appended_treatment_nn(
     "--batch-size",
     default=32,
     type=int,
-    help="number of examples to read during each training step, default=2048",
+    help="number of examples to read during each training step, default=32",
 )
 @click.option(
     "--epochs", type=int, default=500, help="number of training epochs, default=500"
@@ -922,3 +955,6 @@ def appended_treatment_an(
                     )
                 )
             ray.get(results)
+
+# if __name__ == "__main__":
+#     cli()

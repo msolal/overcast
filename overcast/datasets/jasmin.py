@@ -40,8 +40,6 @@ class JASMIN(data.Dataset):
         y_vars_ds = list(filter(None, list(vars_names[y] for y in y_vars)))
         # Read csv
         df = pd.read_csv(f"{data_dir}/{dataset}.csv", index_col=0)
-        # df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        # df.dropna()
         # Filtering AOD
         if t_var == "AOD" and filter_aod:
             df = df[df[t_var_ds].between(0.03, 0.3)]

@@ -342,19 +342,19 @@ def plot_apos(reference_experiment, comparison_experiments, apo_limits_log_lambd
 # _ = nn_pacific.get_apo_limits_from_scratch(4.0)
 # _ = nn_pacific.get_apo_limits_from_scratch(8.0)
 
-# 12932
-nn_atlantic = Experiment(
-    "/users/ms21mmso/msc-project/overcast/output/jasmin-four_outputs_liqcf_atlantic_treatment-AOD_covariates-RH900-RH850-RH700-LTS-EIS-W500-SST_outcomes-re-COD-CWP-LPC_bins-1/appended-treatment-nn/dh-96_nco-3_nct-9_dp-5_ns-0.11_bt-0.0_ln-False_dr-0.04_sn-0.0_lr-0.0002_bs-224_ep-9",
-    "nn_atlantic",
- )
-_ = nn_atlantic.get_apo_limits_from_scratch(16.0)
-_ = nn_atlantic.get_apo_limits_from_scratch(0.05)
-_ = nn_atlantic.get_apo_limits_from_scratch(0.1)
-_ = nn_atlantic.get_apo_limits_from_scratch(0.2)
-_ = nn_atlantic.get_apo_limits_from_scratch(0.5)
-_ = nn_atlantic.get_apo_limits_from_scratch(2.0)
-_ = nn_atlantic.get_apo_limits_from_scratch(4.0)
-_ = nn_atlantic.get_apo_limits_from_scratch(8.0)
+# # 12932
+# nn_atlantic = Experiment(
+#     "/users/ms21mmso/msc-project/overcast/output/jasmin-four_outputs_liqcf_atlantic_treatment-AOD_covariates-RH900-RH850-RH700-LTS-EIS-W500-SST_outcomes-re-COD-CWP-LPC_bins-1/appended-treatment-nn/dh-96_nco-3_nct-9_dp-5_ns-0.11_bt-0.0_ln-False_dr-0.04_sn-0.0_lr-0.0002_bs-224_ep-9",
+#     "nn_atlantic",
+#  )
+# _ = nn_atlantic.get_apo_limits_from_scratch(16.0)
+# _ = nn_atlantic.get_apo_limits_from_scratch(0.05)
+# _ = nn_atlantic.get_apo_limits_from_scratch(0.1)
+# _ = nn_atlantic.get_apo_limits_from_scratch(0.2)
+# _ = nn_atlantic.get_apo_limits_from_scratch(0.5)
+# _ = nn_atlantic.get_apo_limits_from_scratch(2.0)
+# _ = nn_atlantic.get_apo_limits_from_scratch(4.0)
+# _ = nn_atlantic.get_apo_limits_from_scratch(8.0)
 
 
 # # 12929
@@ -369,3 +369,10 @@ _ = nn_atlantic.get_apo_limits_from_scratch(8.0)
 # )
 
 # plot_apos(nn_pacific, [nn_atlantic], [0.05, 0.1, 0.2])
+
+tr_pacific = Experiment(
+    "/users/ms21mmso/msc-project/overcast/output/jasmin-daily-four_outputs_liqcf_pacific_treatment-AOD_covariates-RH900-RH850-RH700-LTS-EIS-W500-SST_outcomes-re-COD-CWP-LPC_bins-1/appended-treatment-transformer/dh-128_nco-22_nct-27_dp-3_nh-8_ns-0.28_bt-0.0_ln-False_dr-0.42_sn-0.0_lr-0.0001_bs-128_ep-500",
+    "Pacific",
+)
+
+_ = tr_pacific.get_apo_limits_from_scratch(0.02)

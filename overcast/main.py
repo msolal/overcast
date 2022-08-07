@@ -34,10 +34,10 @@ def train(
 ):
     ray.init(
         num_gpus=context.obj["n_gpu"],
-        dashboard_host="127.0.0.1",
+        # dashboard_host="127.0.0.1",
         ignore_reinit_error=True,
         object_store_memory=8000000000,
-        # include_dashboard=False,
+        include_dashboard=False,
         # num_cpus=4,
     )
     context.obj.update(

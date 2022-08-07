@@ -255,6 +255,7 @@ class JASMINDaily(data.Dataset):
                             group[x_vars_ds].to_numpy(dtype="float32")
                         )
                     )
+                    print(self.data[-1].shape)
                     self.treatments.append(
                         self.treatments_xfm.transform(
                             group[t_var_ds].to_numpy(dtype="float32").reshape(-1, 1)

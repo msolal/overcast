@@ -138,11 +138,12 @@ def tune_func(config):
         metric="mean_loss",
         mode="min",
         name="bohb",
-        resources_per_trial={"gpu": config.get("gpu_per_model"),},
+        resources_per_trial={"gpu": config.get("gpu_per_model"),"cpu": 4}, ##
         num_samples=config.get("max_samples"),
         search_alg=algorithm,
         scheduler=scheduler,
         local_dir=config.get("experiment_dir"),
         config=config,
+        resume=True, ##
     )
     print("Best hyperparameters found were: ", analysis.best_config)

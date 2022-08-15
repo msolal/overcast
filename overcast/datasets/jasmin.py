@@ -20,9 +20,9 @@ class JASMIN(data.Dataset):
         data_dir: str,
         dataset: str,
         split: str,
-        x_vars: list = ["RH850", "RH700", "LTS", "W500", "SST"],
+        x_vars: list = ["RH900", "RH850", "RH700", "EIS", "LTS", "W500", "SST"],
         t_var: str = "AOD",
-        y_vars: list = ["re", "COD", "CWP"],
+        y_vars: list = ["re", "COD", "CWP", "LPC"],
         t_bins: int = 2,
         filter_aod: bool = True,
         filter_precip: bool = True,
@@ -35,9 +35,11 @@ class JASMIN(data.Dataset):
         vars_names = pd.read_csv(
             f"{data_dir}/variables.csv", index_col=0, header=0, na_filter=False
         ).loc[dataset]
-        x_vars_ds = list(filter(None, list(vars_names[x] for x in x_vars)))
+        # x_vars_ds = list(filter(None, list(vars_names[x] for x in x_vars)))
+        x_vars_ds = list(vars_names[x] for x in x_vars)
         t_var_ds = vars_names[t_var]
-        y_vars_ds = list(filter(None, list(vars_names[y] for y in y_vars)))
+        # y_vars_ds = list(filter(None, list(vars_names[y] for y in y_vars)))
+        y_vars_ds = list(vars_names[y] for y in y_vars)
         # Read csv
         df = pd.read_csv(f"{data_dir}/{dataset}.csv", index_col=0)
         # Filtering AOD
@@ -255,7 +257,7 @@ class JASMINDaily(data.Dataset):
                             group[x_vars_ds].to_numpy(dtype="float32")
                         )
                     )
-                    print(self.data[-1].shape)
+                    # print(self.data[-1].shape)
                     self.treatments.append(
                         self.treatments_xfm.transform(
                             group[t_var_ds].to_numpy(dtype="float32").reshape(-1, 1)

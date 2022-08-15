@@ -646,17 +646,3 @@ _ = tr_pacific_bis.load_apo_limits_from_scratch(0.01)
 
 # %%
 # plot_without_points(tr_pacific, tr_pacific_bis, 0, 0.02)
-
-# %%
-
-
-# %%
-
-
-# %%
-
-
-# %%
-
-
-

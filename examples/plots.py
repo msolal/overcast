@@ -2,17 +2,41 @@ import json
 
 import numpy as np
 
+from scipy import stats
+
 from pathlib import Path
 
 from overcast import models
 from overcast import datasets
 from overcast.models import ensembles
+from overcast.visualization import plotting
 
 from sklearn.preprocessing import MinMaxScaler
 
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+rc = {
+    "figure.constrained_layout.use": True,
+    "figure.facecolor": "white",
+    "axes.labelsize": 20,
+    "axes.titlesize": 18,
+    "legend.frameon": True,
+    "figure.figsize": (6, 6),
+    "legend.fontsize": 18,
+    "legend.title_fontsize": 18,
+    "xtick.labelsize": 16,
+    "ytick.labelsize": 16,
+}
+_ = sns.set(style="whitegrid", palette="colorblind", rc=rc)
+
+TARGET_KEYS = {
+    "Nd": "N_d", 
+    "re": r"$r_e$", 
+    "COD": r"$\tau$",
+    "CWP": "CWP", 
+    "LPC": r"$CF_w$",
+}
 
 class Experiment:
     def __init__(self, experiment_path, name):
@@ -65,9 +89,6 @@ class Experiment:
         self.treatments = treatments
         self.outcomes = outcomes
         self.apos_ensemble = apos_ensemble
-
-        means_ensemble = self.get_means_ensemble()
-        self.means_ensemble = means_ensemble
 
         self.apo_limits = {}
 
@@ -198,21 +219,156 @@ class Experiment:
     def get_means_ensemble(self): 
         return ensembles.predict_mean(self.ensemble, self.ds["test"], batch_size=None)
 
-tr_pacific_without_w500 = Experiment(
-    "/scratch/ms21mmso/output/nice/jasmin-daily-four_outputs_liqcf_pacific_treatment-AOD_covariates-RH900-RH850-RH700-LTS-EIS-SST_outcomes-re_bins-1/appended-treatment-transformer/dh-256_nco-24_nct-24_dp-3_nh-4_ns-0.01_bt-0.0_ln-False_dr-0.5_sn-0.0_lr-0.0002_bs-32_ep-500",
-    r"Pacific without $\omega500$",
-)
+
+def plot_scatterplot(experiment, idx_outcome, savepath=None):
+    plt.plot(figsize=(6, 6))
+    qs = np.quantile(experiment.outcomes[:, idx_outcome], [0.01, 0.99])
+    domain = np.arange(qs[0], qs[1], 0.01)
+    means_ensemble = experiment.get_means_ensemble()
+    slope, intercept, r, p, stderr = stats.linregress(
+        experiment.outcomes[:, idx_outcome], means_ensemble.mean(0)[:, idx_outcome]
+    )
+    sns.scatterplot(x=experiment.outcomes[:, idx_outcome], y=means_ensemble.mean(0)[:, idx_outcome], s=0.5)
+    plt.plot(domain, domain, c="C1")
+    plt.plot(domain, domain * slope + intercept, c="C2", label=f"$r^2$={r**2:.03f}")
+    plt.xlim(qs)
+    plt.ylim(qs)
+    plt.xlabel(f"{TARGET_KEYS[experiment.target_keys[idx_outcome]]} true")
+    plt.ylabel(f"{TARGET_KEYS[experiment.target_keys[idx_outcome]]} predicted")
+    plt.legend(loc="upper left")
+    if savepath is not None:
+        plt.savefig(savepath)
+
+
+def plot_apos(reference_experiment, comparison_experiments, apo_limits_log_lambda_list):
+    alpha = 0.05
+    _, ax = plt.subplots(2, 2, figsize=(12, 12))
+    for idx_outcome in range(len(reference_experiment.target_keys)):
+        i, j = idx_outcome // 2, idx_outcome % 2
+        # plot comparison experiments APOs
+        for k in range(len(comparison_experiments)):
+            scaler = MinMaxScaler()
+            scaler = scaler.fit(
+                comparison_experiments[k]
+                .apos_ensemble[idx_outcome]
+                .mean(0)
+                .reshape(-1, 1)
+            )
+            _ = ax[i][j].plot(
+                comparison_experiments[k].treatments,
+                scaler.transform(
+                    comparison_experiments[k]
+                    .apos_ensemble[idx_outcome]
+                    .mean(0)
+                    .reshape(-1, 1)
+                ),
+                label=comparison_experiments[k].name,
+            )
+        reference_scaler = MinMaxScaler()
+        reference_scaler = reference_scaler.fit(
+            reference_experiment.apos_ensemble[idx_outcome].mean(0).reshape(-1, 1)
+        )
+        _ = ax[i][j].plot(
+            reference_experiment.treatments,
+            scaler.transform(
+                reference_experiment.apos_ensemble[idx_outcome].mean(0).reshape(-1, 1)
+            ),
+            label=reference_experiment.name,
+        )
+        for l in apo_limits_log_lambda_list:
+            if l not in reference_experiment.apo_limits:
+                reference_experiment.get_apo_limits(l)
+        for idx in range(len(apo_limits_log_lambda_list)-1):
+            l = apo_limits_log_lambda_list[idx]
+            next_l = apo_limits_log_lambda_list[idx + 1]
+            _ = ax[i][j].fill_between(
+                x=reference_experiment.treatments,
+                y1=reference_scaler.transform(
+                    np.quantile(
+                        reference_experiment.apo_limits[l][1][idx_outcome],
+                        1 - alpha / 2,
+                        axis=0,
+                    ).reshape(-1, 1)
+                ).flatten(),
+                y2=reference_scaler.transform(
+                    np.quantile(
+                        reference_experiment.apo_limits[next_l][1][idx_outcome],
+                        alpha / 2,
+                        axis=0,
+                    ).reshape(-1, 1)
+                ).flatten(),
+                alpha=0.2,
+                label=r"$\Lambda=$" + f"{np.exp(l):.01f}",
+            )
+            _ = ax[i][j].fill_between(
+                x=reference_experiment.treatments,
+                y1=reference_scaler.transform(
+                    np.quantile(
+                        reference_experiment.apo_limits[l][0][idx_outcome],
+                        1 - alpha / 2,
+                        axis=0,
+                    ).reshape(-1, 1)
+                ).flatten(),
+                y2=reference_scaler.transform(
+                    np.quantile(
+                        reference_experiment.apo_limits[next_l][0][idx_outcome],
+                        alpha / 2,
+                        axis=0,
+                    ).reshape(-1, 1)
+                ).flatten(),
+                alpha=0.2,
+                label=r"$\Lambda=$" + f"{np.exp(l):.01f}",
+            )
+        last = apo_limits_log_lambda_list[-1]
+        _ = ax[i][j].fill_between(
+            x=reference_experiment.treatments,
+            y1=reference_scaler.transform(
+                np.quantile(
+                    reference_experiment.apo_limits[last][1][idx_outcome],
+                    1 - alpha / 2,
+                    axis=0,
+                ).reshape(-1, 1)
+            ).flatten(),
+            y2=reference_scaler.transform(
+                np.quantile(
+                    reference_experiment.apos_ensemble[idx_outcome], alpha / 2, axis=0
+                ).reshape(-1, 1)
+            ).flatten(),
+            alpha=0.2,
+            label=r"$\Lambda=$" + f"{np.exp(l):.01f}",
+        )
+        _ = ax[i][j].fill_between(
+            x=reference_experiment.treatments,
+            y1=reference_scaler.transform(
+                np.quantile(
+                    reference_experiment.apo_limits[last][0][idx_outcome],
+                    1 - alpha / 2,
+                    axis=0,
+                ).reshape(-1, 1)
+            ).flatten(),
+            y2=reference_scaler.transform(
+                np.quantile(
+                    reference_experiment.apos_ensemble[idx_outcome], alpha / 2, axis=0
+                ).reshape(-1, 1)
+            ).flatten(),
+            alpha=0.2,
+            label=r"$\Lambda=$" + f"{np.exp(last):.01f}",
+        )
+        _ = ax[i][j].fill_between(
+            x=reference_experiment.treatments,
+            y1=np.quantile(reference_experiment.apos_ensemble[idx_outcome], 1 - alpha / 2, axis=0),
+            y2=np.quantile(reference_experiment.apos_ensemble[idx_outcome], alpha / 2, axis=0),
+            alpha=0.2,
+            label=r"$\Lambda \to 1.0 $",
+        )
+        _ = ax[i][j].legend(title=r"$\alpha=$" + f"{alpha}", loc="upper left",)
+        _ = ax[i][j].set_xlabel(reference_experiment.ds["train"].treatment_names[0])
+        _ = ax[i][j].set_ylabel(reference_experiment.target_keys[idx_outcome])
+    plt.savefig(f"results/{reference_experiment.name}-{apo_limits_log_lambda_list[0]}.pdf")
 
 tr_pacific = Experiment(
     "/scratch/ms21mmso/output/nice/jasmin-daily-four_outputs_liqcf_pacific_treatment-AOD_covariates-RH900-RH850-RH700-LTS-EIS-W500-SST_outcomes-re-COD-CWP-LPC_bins-1/appended-treatment-transformer/dh-128_nco-22_nct-27_dp-3_nh-8_ns-0.28_bt-0.0_ln-False_dr-0.42_sn-0.0_lr-0.0001_bs-128_ep-500",
-    "LR Pacific with context",
+    "Pacific",
 )
 
-tr_pacific_without_rh = Experiment(
-    "/scratch/ms21mmso/output/nice/jasmin-daily-four_outputs_liqcf_pacific_treatment-AOD_covariates-LTS-EIS-W500-SST_outcomes-re-COD-CWP-LPC_bins-1/appended-treatment-transformer/dh-128_nco-22_nct-27_dp-3_nh-8_ns-0.28_bt-0.0_ln-False_dr-0.42_sn-0.0_lr-0.0001_bs-128_ep-500", 
-    r"Pacific without RH",
-)
-
-_ = tr_pacific.get_apo_limits(0.25, from_scratch=True)
-_ = tr_pacific.get_apo_limits(0.15, from_scratch=True)
-_ = tr_pacific_without_rh.get_apo_limits(0.02, from_scratch=True)
+plot_scatterplot(tr_pacific, 0, '/scratch/ms21mmso/results/scatterplot_tr_lrp_re.pdf')
